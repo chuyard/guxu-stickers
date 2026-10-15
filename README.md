@@ -102,7 +102,11 @@ npm start
 
 **之后普通库存变更只提交仓库数据，不改变工具定义和 UI 资源，不需要重新连接。**
 
-本次验收进度见 `VALIDATION.md`；正式连接和真实服务器验证未完成前，不创建 Skill、不宣称全部交付完成。
+本次已完成真实部署、电脑/iPhone 紧凑 UI、以及新增第二图而不重启/部署/重连的验收。实际过程和证据见 `VALIDATION.md`；日常窗口完整交接见 `docs/MCP-HANDOFF.md`。施工窗口没有创建聊天 Skill。
+
+正式使用连接为 **顾叙表情包库存**，新工具 `show_sticker(id?, query?)` 已识别。旧的“顾叙表情包”仍保存旧工具定义，不用于本版日常调用。普通库存更新不再需要新建连接。测试图已从目录下架，历史文件保留。
+
+协议与同步测试使用独立固定目录样例，今后增减实际库存不会改变测试用例的数量假设；实际 `catalog.json` 与文件仍由 `npm run validate:catalog` 单独校验。
 
 官方参考：
 - https://developers.openai.com/plugins/reference

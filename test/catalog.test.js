@@ -11,7 +11,9 @@ import { validateLocalCatalog } from '../scripts/validate-catalog.js';
 import { catalog, first, photo, second, secondBytes, FakeSource, COMMIT_A, COMMIT_B, COMMIT_C, blobSha } from './helpers.js';
 
 test('supplied default metadata, stable content hash, valid local image and deduplication helper', async () => {
-  assert.equal((await validateLocalCatalog()).defaultId, 'stk-c043f61536d6');
+  const liveCatalog = await validateLocalCatalog();
+  assert.ok(liveCatalog.items.some(item => item.id === liveCatalog.defaultId));
+  assert.equal(catalog.defaultId, 'stk-c043f61536d6');
   assert.equal(verifyImage(first, photo).id, first.id);
   assert.throws(() => verifyImage(first, secondBytes), /mismatch/);
   assert.match(imageUrl(COMMIT_A, first.file), new RegExp(`@${COMMIT_A}/stickers/`));

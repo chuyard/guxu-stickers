@@ -4,7 +4,7 @@
 
 ## 已核对的基线
 
-Ubuntu 24.04、x86_64、用户 ubuntu；Docker 需 sudo；宿主没有 Node/npm，有 Python 3。Caddy 使用 `/etc/caddy/Caddyfile`。OB 容器 `ombre-brain` 使用 `127.0.0.1:18001`，表情包容器 `guxu-stickers` 使用 `127.0.0.1:8788`。目前正式服务是 0.2.0。
+Ubuntu 24.04、x86_64、用户 ubuntu；Docker 需 sudo；宿主没有 Node/npm，有 Python 3。Caddy 使用 `/etc/caddy/Caddyfile`。OB 容器 `ombre-brain` 使用 `127.0.0.1:18001`，表情包容器 `guxu-stickers` 使用 `127.0.0.1:8788`。升级前正式服务是 0.2.0；本次已于 2026-10-15 16:27 升级为 0.3.0，随后完成两端及动态库存验收。以下升级流程保留为维护参考，普通库存更新不执行该脚本。
 
 Caddy 已有 `/stickers/*` 剥前缀反代到 8788，其余仍到 OB。新版本不覆盖 Caddy、不重启 Caddy、不改 OB 服务。`Caddyfile.verified-server` 仅保留核对参考。
 
@@ -35,3 +35,7 @@ Caddy 已有 `/stickers/*` 剥前缀反代到 8788，其余仍到 OB。新版本
 等待当前缓存超过约两分钟后，在原连接中按第二图 ID 调用，并核对返回图片固定在新提交。再次检查容器 ID、StartedAt 和 Pid 与之前相同，未部署、未重启、未重新连接。记录桌面和 iPhone 显示。本地可控时钟测试只证明逻辑，不能冒充这个真实验收。
 
 验收后可以只从目录下架测试图，保留正式历史文件；不得覆盖默认猫猫。把真实记录补入 VALIDATION.md 与 docs/MCP-HANDOFF.md，再交接日常窗口写 Skill。
+
+## 本次已验收状态
+
+初始运行代码提交 ec7d35eb3a4e7bf5e264e4ed58244690fe3f32e8；旧容器备份 guxu-stickers-before-inventory-20261015-162703。正式连接“顾叙表情包库存”已识别 show_sticker(id?,query?)；用户确认电脑和 iPhone 正常。真实第二图加图前后容器 ID、StartedAt、PID 均相同，动态更新通过。详见 VALIDATION.md 和 docs/MCP-HANDOFF.md。

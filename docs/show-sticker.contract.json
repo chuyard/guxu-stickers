@@ -1,0 +1,189 @@
+{
+  "connectionName": "顾叙表情包库存",
+  "endpoint": "https://ob.chuyard.cn/stickers/mcp",
+  "tool": {
+    "name": "show_sticker",
+    "title": "表情包",
+    "description": "只读显示正式库存中的单张表情包。id 精确选图，不存在则报错且不替换；query 综合匹配标题、原文、标签、同义表达、适用语境和语气，并排除与 avoid 明显冲突的结果，匹配不足返回没有合适的表情包。同时提供 id 和 query 时以 id 为准；均省略则显示默认图片。查询应包含当前聊天的实际语境，尤其是真难过、认真表达不满或严肃冲突等限制；不要只保留正面关键词。只检索仓库已发布目录，不生成图片、不写入仓库。调用后自然回应，不播报工具过程；数据返回不代表客户端图片已加载。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "稳定图片 ID；优先于 query，未知 ID 明确报错。",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "query": {
+          "description": "完整查询语境、内容、情绪或标签；保留严肃冲突、真难过等不适用情形。",
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "no_match",
+            "error"
+          ]
+        },
+        "sticker": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "imageUrl": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "alt",
+                "imageUrl"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "catalog": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "commit": {
+                  "type": "string"
+                },
+                "stale": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "commit",
+                "stale"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "id",
+                    "query",
+                    "default"
+                  ]
+                },
+                "score": {
+                  "type": "number"
+                },
+                "matchedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "enum": [
+                    "ID_NOT_FOUND",
+                    "CATALOG_UNAVAILABLE"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "sticker",
+        "catalog",
+        "selection",
+        "error"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ],
+      "ui": {
+        "resourceUri": "ui://guxu-stickers/inventory-image-v5.html",
+        "visibility": [
+          "model"
+        ]
+      },
+      "openai/outputTemplate": "ui://guxu-stickers/inventory-image-v5.html",
+      "openai/toolInvocation/invoking": "打开表情包",
+      "openai/toolInvocation/invoked": "表情包",
+      "ui/resourceUri": "ui://guxu-stickers/inventory-image-v5.html"
+    }
+  }
+}

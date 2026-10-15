@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { inspectImage } from '../catalog.js';
-export const catalog = JSON.parse(readFileSync(new URL('../catalog.json', import.meta.url)));
+export const catalog = JSON.parse(readFileSync(new URL('./fixtures/catalog.json', import.meta.url)));
 export const first = catalog.items[0];
 export const photo = readFileSync(new URL(`../${first.file}`, import.meta.url));
 export const secondBytes = readFileSync(new URL('./fixtures/inventory-check.png', import.meta.url));
