@@ -1,0 +1,37 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import assert from 'node:assert/strict';
+const endpoint = new URL(process.argv[2] ?? 'http://127.0.0.1:8788/mcp');
+if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password) throw new Error('Supply an HTTP(S) MCP URL without credentials.');
+const client = new Client({ name: 'guxu-stickers-deployment-check', version: '0.3.0' });
+try {
+  await client.connect(new StreamableHTTPClientTransport(endpoint));
+  const { tools } = await client.listTools();
+  assert.equal(tools.length, 1); const tool = tools[0];
+  assert.equal(tool.name, 'show_sticker');
+  assert.deepEqual(Object.keys(tool.inputSchema.properties).sort(), ['id', 'query']);
+  const call = args => client.callTool({ name: 'show_sticker', arguments: args });
+  const initial = await call({});
+  assert.equal(initial.structuredContent.status, 'ok');
+  assert.match(initial.structuredContent.catalog.commit, /^[a-f0-9]{40}$/);
+  const id = initial.structuredContent.sticker.id;
+  assert.equal((await call({ id, query: '没有任何匹配词 xyz-no-match-91642' })).structuredContent.sticker.id, id);
+  const missing = await call({ id: 'stk-000000000000' });
+  assert.equal(missing.isError, true); assert.equal(missing.structuredContent.error.code, 'ID_NOT_FOUND');
+  assert.equal(missing.structuredContent.sticker, null);
+  const none = await call({ query: 'xyz-no-match-91642' });
+  assert.equal(none.structuredContent.status, 'no_match'); assert.equal(none.structuredContent.sticker, null);
+  const match = await call({ query: '猫猫 装凶 调侃' });
+  assert.equal(match.structuredContent.status, 'ok');
+  const avoid = await call({ query: '猫猫 装凶 夏初真的难过' });
+  assert.equal(avoid.structuredContent.status, 'no_match');
+  const resource = await client.readResource({ uri: tool._meta.ui.resourceUri });
+  assert.equal(resource.contents[0].mimeType, 'text/html;profile=mcp-app');
+  assert.equal(resource.contents[0]._meta.ui.prefersBorder, false);
+  assert.equal(tool._meta.ui.resourceUri, 'ui://guxu-stickers/inventory-image-v5.html');
+  console.log('PASS MCP initialization, single show_sticker(id?, query?), exact ID, ID priority, missing ID, query, avoid, no match, default and UI resource');
+  console.log('Catalog commit:', initial.structuredContent.catalog.commit);
+  console.log('Default ID:', id);
+  console.log('UI resource:', tool._meta.ui.resourceUri);
+  console.log('Desktop/iPhone visual rendering and a real repository update still require separate acceptance.');
+} finally { await client.close(); }

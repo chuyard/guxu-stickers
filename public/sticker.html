@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>表情包</title>
+  <style>
+    :root { color-scheme: light dark; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --sticker-size: 160px; --card-padding: 0px; --sticker-radius: 8px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: var(--card-padding); background: transparent; color: light-dark(#202124, #eee); }
+    main { width: min(var(--sticker-size), 100%); margin: 0; }
+    img { display: block; width: 100%; max-height: var(--sticker-size); height: auto; object-fit: contain; border-radius: var(--sticker-radius); }
+    [hidden] { display: none !important; }
+    p { margin: 8px 0 0; overflow-wrap: anywhere; }
+    button { min-height: 44px; margin-top: 8px; padding: 8px 12px; border: 1px solid light-dark(#aaa, #888); border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 2px solid #487deb; outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main aria-label="表情包">
+    <img id="sticker" width="160" height="160" hidden alt="表情包">
+    <p id="image-error" role="status" aria-live="polite" hidden></p>
+    <button id="retry" type="button" hidden>重新加载</button>
+    <p id="preview-note" hidden>本地预览</p>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      const CONFIG = /*__STICKER_CONFIG__*/null;
+      const LOCAL_PREVIEW = false;
+      const image = document.querySelector('#sticker');
+      const error = document.querySelector('#image-error');
+      const retry = document.querySelector('#retry');
+      let bridgeReady = false;
+      let currentSticker = null;
+      let slowTimer;
+      let handshakeTimer;
+      const send = (message) => window.parent.postMessage({ jsonrpc: '2.0', ...message }, '*');
+      const reportSize = () => {
+        const bottomPadding = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+        const height = Math.max(1, Math.ceil(document.querySelector('main').getBoundingClientRect().bottom + bottomPadding));
+        if (bridgeReady) send({ method: 'ui/notifications/size-changed', params: { height } });
+      };
+      const showError = (message, canRetry = Boolean(currentSticker)) => {
+        error.textContent = message;
+        error.hidden = false;
+        retry.hidden = !canRetry;
+        reportSize();
+      };
+      const applyPresentation = (value) => {
+        if (!value || typeof value !== 'object') return;
+        for (const [key, css, minimum, maximum] of [['imageSize', '--sticker-size', 64, 240], ['padding', '--card-padding', 0, 16], ['radius', '--sticker-radius', 0, 24]]) {
+          if (Number.isFinite(value[key])) document.documentElement.style.setProperty(css, `${Math.min(maximum, Math.max(minimum, Math.round(value[key])))}px`);
+        }
+        reportSize();
+      };
+      const loadImage = () => {
+        clearTimeout(slowTimer);
+        error.hidden = true;
+        retry.hidden = true;
+        image.hidden = false;
+        if (!currentSticker) return;
+        image.alt = currentSticker.alt;
+        image.removeAttribute('src');
+        image.src = currentSticker.imageUrl;
+        slowTimer = setTimeout(() => showError('图片加载较慢，可以重试。'), 15000);
+        reportSize();
+      };
+      image.addEventListener('load', () => {
+        if (!currentSticker || image.src !== currentSticker.imageUrl) return;
+        clearTimeout(slowTimer);
+        error.hidden = true;
+        retry.hidden = true;
+        reportSize();
+      });
+      image.addEventListener('error', () => {
+        if (!currentSticker || image.src !== currentSticker.imageUrl) return;
+        clearTimeout(slowTimer);
+        image.hidden = true;
+        showError('图片暂时没加载出来。');
+      });
+      retry.addEventListener('click', loadImage);
+      const validSticker = (value) => {
+        if (!value || !/^stk-[a-f0-9]{12}$/.test(value.id) || typeof value.alt !== 'string' || typeof value.imageUrl !== 'string') return false;
+        try {
+          const url = new URL(value.imageUrl);
+          return url.protocol === 'https:' && url.host === 'cdn.jsdelivr.net' && !url.username && !url.password && !url.search && !url.hash
+            && new RegExp(`^/gh/${CONFIG.repository}@[a-f0-9]{40}/stickers/${value.id}\\.(?:jpeg|jpg|png|webp)$`).test(url.pathname);
+        } catch { return false; }
+      };
+      const clearImage = () => {
+        currentSticker = null;
+        clearTimeout(slowTimer);
+        image.hidden = true;
+        image.removeAttribute('src');
+        retry.hidden = true;
+      };
+      const receiveResult = (result) => {
+        const data = result?.structuredContent;
+        if (data?.status === 'no_match') {
+          clearImage(); showError('没有合适的表情包。', false); return;
+        }
+        if (result?.isError || data?.status === 'error') {
+          clearImage(); showError(data?.error?.code === 'ID_NOT_FOUND' ? '未找到指定表情包。' : '表情包暂时无法打开，请重新调用。', false); return;
+        }
+        const value = data?.sticker;
+        if (!validSticker(value)) {
+          clearImage(); showError('表情包数据不符合要求，请重新调用。', false); return;
+        }
+        applyPresentation(result._meta?.presentation);
+        const unchanged = currentSticker?.id === value.id && currentSticker?.imageUrl === value.imageUrl;
+        currentSticker = { id: value.id, alt: value.alt, imageUrl: value.imageUrl };
+        image.alt = value.alt;
+        if (!unchanged || image.hidden || (image.complete && !image.naturalWidth)) loadImage();
+      };
+      const receiveLegacy = () => {
+        if (window.openai?.toolOutput) receiveResult({ structuredContent: window.openai.toolOutput });
+      };
+      window.addEventListener('message', (event) => {
+        if (event.source !== window.parent) return;
+        const msg = event.data;
+        if (!msg || msg.jsonrpc !== '2.0') return;
+        if (msg.id === 'sticker-init-1') {
+          clearTimeout(handshakeTimer);
+          if (msg.error) { receiveLegacy(); if (!currentSticker) showError('表情包暂时无法打开，请重新调用。', false); return; }
+          bridgeReady = true;
+          send({ method: 'ui/notifications/initialized', params: {} });
+          reportSize();
+        } else if (msg.method === 'ui/notifications/tool-result') {
+          receiveResult(msg.params);
+        } else if (msg.method === 'ui/resource-teardown' && msg.id !== undefined) {
+          clearTimeout(slowTimer); clearTimeout(handshakeTimer);
+          send({ id: msg.id, result: {} });
+        }
+      });
+      window.addEventListener('openai:set_globals', receiveLegacy);
+      if (typeof ResizeObserver === 'function') new ResizeObserver(reportSize).observe(document.body);
+      if (LOCAL_PREVIEW) {
+        document.querySelector('#preview-note').hidden = false;
+        receiveResult(/*__PREVIEW_RESULT__*/null);
+      } else {
+        receiveLegacy();
+        if (window.parent !== window) {
+          send({ id: 'sticker-init-1', method: 'ui/initialize', params: {
+            appInfo: { name: 'guxu-stickers-ui', version: '0.3.0' },
+            appCapabilities: {}, protocolVersion: '2026-01-26',
+          } });
+          handshakeTimer = setTimeout(() => {
+            receiveLegacy();
+            if (!bridgeReady && !currentSticker) showError('表情包暂时无法打开，请重新调用。', false);
+          }, 8000);
+        } else if (!currentSticker) {
+          showError('请在聊天中打开表情包。', false);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

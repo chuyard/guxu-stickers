@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+.env.*
+*.zip
+test-results
+deploy
+*.md
+.cache
+incoming

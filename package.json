@@ -1,0 +1,20 @@
+{
+  "name": "guxu-stickers-ui-minimal",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "validate:catalog": "node scripts/validate-catalog.js",
+    "prepare:asset": "node scripts/prepare-asset.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.3",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  }
+}

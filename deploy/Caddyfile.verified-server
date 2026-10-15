@@ -1,0 +1,11 @@
+# Prepared from the complete Caddyfile supplied on 2026-10-15.
+# Validate using the actual server's Caddy before installing/reloading.
+ob.chuyard.cn {
+    handle_path /stickers/* {
+        reverse_proxy 127.0.0.1:8788
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:18001
+    }
+}
