@@ -1,7 +1,7 @@
 import { readFile, mkdir, writeFile, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
-import { REPOSITORY, BRANCH, COMMIT_PATTERN, MAX_IMAGE_BYTES, validateCatalog, imageUrl, verifyImage } from './catalog.js';
+import { REPOSITORY, BRANCH, COMMIT_PATTERN, MAX_IMAGE_BYTES, HASH_ID_PATTERN, SEQUENTIAL_ID_PATTERN, validateCatalog, imageUrl, verifyImage } from './catalog.js';
 
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_CACHE_BYTES = 8 * 1024 * 1024;
@@ -21,7 +21,7 @@ async function readLimited(response, limit) {
 export class GitHubSource {
   constructor({ fetchImpl = fetch } = {}) { this.fetch = fetchImpl; }
   async request(url, { etag, limit = MAX_JSON_BYTES, api = false } = {}) {
-    const headers = { 'User-Agent': 'guxu-stickers/0.3.0' };
+    const headers = { 'User-Agent': 'guxu-stickers/0.4.0' };
     if (api) { headers.Accept = 'application/vnd.github+json'; headers['X-GitHub-Api-Version'] = '2022-11-28'; }
     if (etag) headers['If-None-Match'] = etag;
     const response = await this.fetch(url, { headers, signal: AbortSignal.timeout(12000), redirect: 'error' });
@@ -44,7 +44,7 @@ export class GitHubSource {
     return data.tree;
   }
   async file(commit, file, limit = MAX_JSON_BYTES) {
-    if (!COMMIT_PATTERN.test(commit) || !(file === 'catalog.json' || /^stickers\/stk-[a-f0-9]{12}\.(jpeg|jpg|png|webp)$/.test(file))) throw new Error('Invalid repository file path');
+    if (!COMMIT_PATTERN.test(commit) || !(file === 'catalog.json' || /^stickers\/stk-(?:[a-f0-9]{12}|\d{3,9})\.(jpeg|jpg|png|webp)$/.test(file))) throw new Error('Invalid repository file path');
     const response = await this.request(`https://raw.githubusercontent.com/${REPOSITORY}/${commit}/${file}`, { limit });
     return response.bytes;
   }
@@ -64,8 +64,11 @@ function validateSaved(value) {
   if (proofByFile.size !== catalog.items.length || value.proofs.length !== catalog.items.length) throw new Error('Invalid saved proof count');
   for (const item of catalog.items) {
     const proof = proofByFile.get(item.file);
-    if (!proof || proof.id !== item.id || !['jpeg','png','webp'].includes(proof.extension) || !/^[a-f0-9]{64}$/.test(proof.sha256) || !COMMIT_PATTERN.test(proof.blobSha)
-        || item.id !== `stk-${proof.sha256.slice(0, 12)}` || !Number.isInteger(proof.size)
+    const identityMatches = SEQUENTIAL_ID_PATTERN.test(item.id)
+      ? item.sha256 === proof?.sha256
+      : HASH_ID_PATTERN.test(item.id) && item.id === `stk-${proof?.sha256?.slice(0, 12)}` && (!item.sha256 || item.sha256 === proof.sha256);
+    if (!proof || proof.id !== item.id || !identityMatches || !['jpeg','png','webp'].includes(proof.extension) || !/^[a-f0-9]{64}$/.test(proof.sha256) || !COMMIT_PATTERN.test(proof.blobSha)
+        || !Number.isInteger(proof.size)
         || proof.size < 12 || proof.size > MAX_IMAGE_BYTES) throw new Error(`Invalid saved proof: ${item.file}`);
     imageUrl(value.commit, item.file);
   }
@@ -163,6 +166,7 @@ export class CatalogStore {
           if (!Number.isInteger(blob.size) || blob.size < 12 || blob.size > MAX_IMAGE_BYTES) throw new Error(`Invalid image size: ${item.file}`);
           const proof = oldProofs.get(`${item.file}:${blob.sha}`)
             ?? verifyImage(item, await this.source.file(head.commit, item.file, MAX_IMAGE_BYTES), blob.sha);
+          if (proof.id !== item.id || (item.sha256 && item.sha256 !== proof.sha256)) throw new Error(`Image digest mismatch: ${item.file}`);
           const previousProof = this.snapshot?.proofs.find(previous => previous.id === item.id);
           if (previousProof && previousProof.sha256 !== proof.sha256) throw new Error(`Existing image ID cannot be overwritten: ${item.id}`);
           if (proof.size !== blob.size) throw new Error(`Image size mismatch: ${item.file}`);

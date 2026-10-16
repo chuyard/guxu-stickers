@@ -22,6 +22,26 @@ test('supplied default metadata, stable content hash, valid local image and dedu
   const run = await promisify(execFile)(process.execPath, ['scripts/prepare-asset.js', first.file, '--write'], { cwd: new URL('..', import.meta.url) });
   assert.equal(JSON.parse(run.stdout).duplicate, true);
   assert.equal(JSON.parse(run.stdout).written, false);
+  const temp = await mkdtemp(join(tmpdir(), 'guxu-sequential-'));
+  const uniqueImage = join(temp, 'thumbnail-source.png');
+  await writeFile(uniqueImage, Buffer.concat([secondBytes, Buffer.from('sequential-id-test')]));
+  const sequentialProof = (await import('../catalog.js')).inspectImage(await readFile(uniqueImage));
+  const sequential = await promisify(execFile)(process.execPath, ['scripts/prepare-asset.js', uniqueImage, '--id', 'stk-001'], { cwd: new URL('..', import.meta.url) });
+  assert.deepEqual(JSON.parse(sequential.stdout), {
+    id: 'stk-001', file: 'stickers/stk-001.png', sha256: sequentialProof.sha256, duplicate: false, written: false,
+  });
+});
+
+test('sequential IDs require and verify the full image digest while legacy hash IDs remain valid', () => {
+  const mixed = structuredClone(catalog); mixed.items.push(structuredClone(second));
+  assert.equal(validateCatalog(mixed).items.at(-1).id, 'stk-001');
+  assert.equal(verifyImage(second, secondBytes).id, 'stk-001');
+  let invalid = structuredClone(mixed); delete invalid.items.at(-1).sha256;
+  assert.throws(() => validateCatalog(invalid), /Sequential IDs require sha256/);
+  invalid = structuredClone(mixed); invalid.items.at(-1).sha256 = '0'.repeat(64);
+  assert.throws(() => verifyImage(invalid.items.at(-1), secondBytes), /mismatch/);
+  invalid = structuredClone(mixed); invalid.items.at(-1).id = 'stk-01'; invalid.items.at(-1).file = 'stickers/stk-01.png';
+  assert.throws(() => validateCatalog(invalid));
 });
 
 test('all fields are validated; duplicate ID/path, unsafe paths, bad default and missing fields rejected', () => {
@@ -148,4 +168,26 @@ test('304 reuses cache without tree/files, missing file and symlink fail closed,
   clock+=120001;assert.equal(await store.getSnapshot(),initial);assert.match(store.health().lastError,/Missing regular/);
   source.tree=async()=> (await originalTree()).map(entry=>entry.path===first.file?{...entry,mode:'120000'}:entry);
   clock+=120001;assert.equal(await store.getSnapshot(),initial);assert.match(store.health().lastError,/Missing regular/);
+});
+
+test('numeric IDs survive offline cache and reject changed digests, reused proof tampering and duplicate images', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'guxu-numeric-cache-'));
+  const source = new FakeSource(); source.catalog.items.push(structuredClone(second));
+  const cacheFile = join(dir, 'cache.json');
+  const store = new CatalogStore({ source, cacheFile });
+  const initial = await store.initialize();
+  assert.equal(initial.proofs.at(-1).id, 'stk-001');
+  source.fail = true;
+  assert.equal((await new CatalogStore({ source, cacheFile }).initialize()).proofs.at(-1).id, 'stk-001');
+  source.fail = false; source.commit = COMMIT_B;
+  source.catalog.items.at(-1).sha256 = '0'.repeat(64);
+  await store.refresh();
+  assert.equal(store.snapshot, initial); assert.match(store.health().lastError, /digest mismatch/);
+  source.catalog.items.at(-1).sha256 = (await import('../catalog.js')).inspectImage(photo).sha256;
+  source.catalog.items.at(-1).file = 'stickers/stk-001.jpeg';
+  source.images.set('stickers/stk-001.jpeg', photo);
+  await store.refresh();
+  assert.equal(store.snapshot, initial); assert.match(store.health().lastError, /cannot be overwritten/);
+  const fresh = new CatalogStore({ source, cacheFile: null });
+  await assert.rejects(fresh.initialize(), /Duplicate image contents/);
 });

@@ -7,7 +7,7 @@ export const photo = readFileSync(new URL(`../${first.file}`, import.meta.url));
 export const secondBytes = readFileSync(new URL('./fixtures/inventory-check.png', import.meta.url));
 export const secondProof = inspectImage(secondBytes);
 export const second = {
-  id: secondProof.id, file: `stickers/${secondProof.id}.png`,
+  id: 'stk-001', file: 'stickers/stk-001.png', sha256: secondProof.sha256,
   title: '库存动态更新验收图', text: '', tags: ['技术验收', '动态更新'], aliases: ['库存验收'],
   contexts: ['验证库存无需重启即可更新'], tone: [], avoid: [], alt: '蓝黄色棋盘格技术验收图',
 };

@@ -1,4 +1,4 @@
-# 现有服务器升级说明 · 0.3.0
+# 现有服务器升级说明 · 0.4.0
 
 这是技术参考。与夏初实际交互时，每次只提供一个明确操作；不要让她一次执行所有阶段。
 
@@ -14,13 +14,13 @@ Caddy 已有 `/stickers/*` 剥前缀反代到 8788，其余仍到 OB。新版本
 2. 服务器直接拉取指定发布提交的代码，不要求用户下载代码到个人电脑；不假设服务器已安装 git，可用已核对的 curl + Python zipfile。
 3. 在拉取的源码目录执行 `bash deploy/update-inventory.sh`。
 
-脚本先构建 `guxu-stickers:0.3.0`（镜像内运行测试与本地目录校验），再用临时容器只读检查 GitHub 正式目录及图片。通过后才停止旧表情包容器、改名保留备份，启动新容器，挂载 `guxu-stickers-catalog` 持久缓存卷。新服务需联网读取库存，因此就绪等待最多约 90 秒；短暂连接拒绝不会立即导致误回退。等待或 MCP 验证失败则自动恢复旧容器。
+脚本先构建 `guxu-stickers:0.4.0`（镜像内运行测试与本地目录校验），再用临时容器只读检查 GitHub 正式目录及图片。通过后才停止旧表情包容器、改名保留备份，启动新容器，挂载 `guxu-stickers-catalog` 持久缓存卷。新服务需联网读取库存，因此就绪等待最多约 90 秒；短暂连接拒绝不会立即导致误回退。等待或 MCP 验证失败则自动恢复旧容器。
 
 必须以服务器实际构建与检查输出作为部署结果；开发环境没有 Docker，不能宣称镜像已构建。
 
 ## 公网和连接
 
-端点仍为 `https://ob.chuyard.cn/stickers/mcp`；健康为 `https://ob.chuyard.cn/stickers/healthz`。升级后健康版本应为 0.3.0，catalog 有 40 位提交、1 个默认猫猫条目和 status ok。执行镜像内 `scripts/check-mcp.js` 核对 ID、query、no_match、avoid、默认项及 v5 UI。
+端点仍为 `https://ob.chuyard.cn/stickers/mcp`；健康为 `https://ob.chuyard.cn/stickers/healthz`。升级后健康版本应为 0.4.0，catalog 有 40 位提交、正式条目和 status ok。执行镜像内 `scripts/check-mcp.js` 核对 ID、query、no_match、avoid、默认项及 v5 UI。工具契约未变，无需刷新连接。
 
 本次唯一工具改名为 `show_sticker`，增加可选 `id`、`query` 参数；UI URI 为 `ui://guxu-stickers/inventory-image-v5.html`。按官方要求刷新连接元数据；当前账户若仍找不到刷新入口，新建一次“顾叙表情包库存”，身份验证选无需身份验证。不要删除现有可用连接来试错。
 

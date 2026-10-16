@@ -4,19 +4,27 @@ import { z } from 'zod';
 export const REPOSITORY = 'chuyard/guxu-stickers';
 export const BRANCH = 'main';
 export const COMMIT_PATTERN = /^[a-f0-9]{40}$/;
-export const ID_PATTERN = /^stk-[a-f0-9]{12}$/;
-export const FILE_PATTERN = /^stickers\/(stk-[a-f0-9]{12})\.(jpeg|jpg|png|webp)$/;
+export const HASH_ID_PATTERN = /^stk-[a-f0-9]{12}$/;
+export const SEQUENTIAL_ID_PATTERN = /^stk-\d{3,9}$/;
+export const ID_PATTERN = /^stk-(?:[a-f0-9]{12}|\d{3,9})$/;
+export const FILE_PATTERN = /^stickers\/(stk-(?:[a-f0-9]{12}|\d{3,9}))\.(jpeg|jpg|png|webp)$/;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const nonempty = z.string().trim().min(1).max(500);
 const phrases = z.array(nonempty).max(80);
+const catalogItemSchema = z.object({
+    id: z.string().regex(ID_PATTERN), file: z.string().regex(FILE_PATTERN),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    title: nonempty, text: z.string().max(2000), tags: phrases, aliases: phrases,
+    contexts: phrases, tone: phrases, avoid: phrases, alt: nonempty,
+  }).strict().superRefine((item, context) => {
+    if (SEQUENTIAL_ID_PATTERN.test(item.id) && !item.sha256) {
+      context.addIssue({ code: 'custom', path: ['sha256'], message: 'Sequential IDs require sha256' });
+    }
+  });
 export const catalogSchema = z.object({
   schemaVersion: z.literal(1),
   defaultId: z.string().regex(ID_PATTERN),
-  items: z.array(z.object({
-    id: z.string().regex(ID_PATTERN), file: z.string().regex(FILE_PATTERN),
-    title: nonempty, text: z.string().max(2000), tags: phrases, aliases: phrases,
-    contexts: phrases, tone: phrases, avoid: phrases, alt: nonempty,
-  }).strict()).min(1).max(2000),
+  items: z.array(catalogItemSchema).min(1).max(2000),
 }).strict();
 
 export function validateCatalog(value) {
@@ -52,11 +60,14 @@ export function inspectImage(bytes) {
 export function verifyImage(item, bytes, expectedBlobSha) {
   const proof = inspectImage(bytes);
   const ext = item.file.split('.').at(-1);
-  if (proof.id !== item.id || !(proof.extension === ext || (proof.extension === 'jpeg' && ext === 'jpg'))) {
+  const identityMatches = SEQUENTIAL_ID_PATTERN.test(item.id)
+    ? item.sha256 === proof.sha256
+    : proof.id === item.id && (!item.sha256 || item.sha256 === proof.sha256);
+  if (!identityMatches || !(proof.extension === ext || (proof.extension === 'jpeg' && ext === 'jpg'))) {
     throw new Error(`Image content/ID/extension mismatch: ${item.file}`);
   }
   if (expectedBlobSha && proof.blobSha !== expectedBlobSha) throw new Error(`Git blob mismatch: ${item.file}`);
-  return { file: item.file, ...proof };
+  return { file: item.file, ...proof, id: item.id };
 }
 
 const segmenter = new Intl.Segmenter('zh-CN', { granularity: 'word' });

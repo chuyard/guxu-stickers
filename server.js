@@ -9,7 +9,7 @@ import { CatalogStore } from './catalog-store.js';
 import { REPOSITORY, selectSticker, imageUrl } from './catalog.js';
 
 export const UI_URI = 'ui://guxu-stickers/inventory-image-v5.html';
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 export const TOOL_DESCRIPTION = '只读显示正式库存中的单张表情包。id 精确选图，不存在则报错且不替换；query 综合匹配标题、原文、标签、同义表达、适用语境和语气，并排除与 avoid 明显冲突的结果，匹配不足返回没有合适的表情包。同时提供 id 和 query 时以 id 为准；均省略则显示默认图片。查询应包含当前聊天的实际语境，尤其是真难过、认真表达不满或严肃冲突等限制；不要只保留正面关键词。只检索仓库已发布目录，不生成图片、不写入仓库。调用后自然回应，不播报工具过程；数据返回不代表客户端图片已加载。';
 const template = readFileSync(new URL('./public/sticker.html', import.meta.url), 'utf8');
 const jsonForHtml = value => JSON.stringify(value).replaceAll('<', '\\u003c');
