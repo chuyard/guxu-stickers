@@ -81,7 +81,7 @@
       });
       retry.addEventListener('click', loadImage);
       const validSticker = (value) => {
-        if (!value || !/^stk-[a-f0-9]{12}$/.test(value.id) || typeof value.alt !== 'string' || typeof value.imageUrl !== 'string') return false;
+        if (!value || !/^stk-(?:[a-f0-9]{12}|\d{3,9})$/.test(value.id) || typeof value.alt !== 'string' || typeof value.imageUrl !== 'string') return false;
         try {
           const url = new URL(value.imageUrl);
           return url.protocol === 'https:' && url.host === 'cdn.jsdelivr.net' && !url.username && !url.password && !url.search && !url.hash
@@ -142,7 +142,7 @@
         receiveLegacy();
         if (window.parent !== window) {
           send({ id: 'sticker-init-1', method: 'ui/initialize', params: {
-            appInfo: { name: 'guxu-stickers-ui', version: '0.3.0' },
+            appInfo: { name: 'guxu-stickers-ui', version: '0.4.0' },
             appCapabilities: {}, protocolVersion: '2026-01-26',
           } });
           handshakeTimer = setTimeout(() => {
